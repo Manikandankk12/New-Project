@@ -1,44 +1,65 @@
+// Jenkins Declarative Pipeline Example
 pipeline {
-    agent any   // Run on any available Jenkins agent
+    agent any  // Run on any available agent
+
+    // Define environment variables
+    environment {
+        APP_NAME = "MyApp"
+        DEPLOY_ENV = "staging"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES') // Fail if pipeline runs too long
+        buildDiscarder(logRotator(numToKeepStr: '10')) // Keep last 10 builds
+    }
 
     stages {
         stage('Checkout') {
             steps {
-                // Pull the code from your Git repository
-                checkout scm
+                echo "Checking out source code..."
+                // Replace with your repository URL
+                git branch: 'testing', url: 'https://github.com/Manikandankk12/New-Project.git'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build') {
             steps {
-                // If your Python file needs dependencies, install them here
-                sh 'python3 -m pip install --upgrade pip'
-                sh 'pip3 install -r requirements.txt || true'
+                echo "Building ${APP_NAME}..."
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Run Python Script') {
+        stage('Test') {
             steps {
-                // Run your Python file
-                sh 'python3 add_numbers.py'
+                echo "Running tests..."
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml' // Publish test results
+                }
             }
         }
-
         stage('Deploy') {
+            when {
+                branch 'main' // Deploy only from main branch
+            }
             steps {
-                // Example deployment step (adjust to your environment)
-                echo 'Deploying Python application...'
-                // You could copy files, restart services, or trigger another job here
+                echo "Deploying ${APP_NAME} to ${DEPLOY_ENV}..."
+                sh './deploy.sh ${DEPLOY_ENV}'
             }
         }
     }
 
     post {
         success {
-            echo 'Deployment completed successfully!'
+            echo "Pipeline completed successfully!"
         }
         failure {
-            echo 'Deployment failed. Please check logs.'
+            echo "Pipeline failed. Please check the logs."
+        }
+        always {
+            cleanWs() // Clean workspace after build
         }
     }
 }
